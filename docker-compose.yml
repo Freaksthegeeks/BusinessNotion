@@ -1,0 +1,53 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - N8N_BASE_URL=http://n8n:5678
+      - N8N_PUBLIC_URL=http://localhost:5678
+      - NODE_JSON_PATH=/app/data_nodes/node.json
+      - DB_PATH=/app/db/leads.db
+      - PORT=8000
+      - HOST=0.0.0.0
+    volumes:
+      - ./data:/app/data_nodes
+      - backend_data:/app/db
+    depends_on:
+      - n8n
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_BACKEND_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  n8n_data:
+  backend_data:

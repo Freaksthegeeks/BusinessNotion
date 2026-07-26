@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Local SQLite Database
+*.db
+leads.db
+db/
+
+# Logs & Environment
+*.log
+.env

@@ -1,0 +1,275 @@
+{
+  "name": "Lead Magnet Funnel - Notion + Teams",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Setup checklist\n1. **Webhook** \u2013 copy the Production URL and paste it into your form tool (Tally/Typeform/Webflow) as the submission destination.\n2. **Notion** \u2013 add Notion API credentials, then replace `YOUR_NOTION_DATABASE_ID` and match the property names (Name/Email/Source/Status) to your real database.\n3. **Email (x2)** \u2013 add SMTP/Gmail credentials, set the From address, and replace the lead-magnet download link.\n4. **Microsoft Teams** \u2013 add Microsoft Teams OAuth2 credentials, then pick your Team and Channel in the node.\n5. Toggle the workflow **Active** once all credentials are set.",
+        "height": 320,
+        "width": 460,
+        "color": 5
+      },
+      "id": "166a6b95-b227-405c-98cc-699f8bfea4ca",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-magnet-signup",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "69bfaaab-5e37-4e5a-93f3-3115f00dc056",
+      "name": "Lead Form Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "66e0093f-055d-478d-9ae8-f0515ed73bc5"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "19ba71d3-3385-4b00-b4b5-5734e263abdc",
+              "name": "name",
+              "value": "={{ $json.body.name }}",
+              "type": "string"
+            },
+            {
+              "id": "4c35c410-eb33-4104-97a6-1ecfccc7ca6d",
+              "name": "email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "4c044f5c-4eaf-4065-86d6-404272a0e43d",
+              "name": "source",
+              "value": "Lead Magnet Funnel",
+              "type": "string"
+            },
+            {
+              "id": "35f9e96e-d523-4923-b990-4e7413819881",
+              "name": "submittedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c2e5c6e5-6899-40d8-83e8-cece7e44734c",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_DATABASE_ID",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name|title",
+              "title": "={{ $json.name }}"
+            },
+            {
+              "key": "Email|email",
+              "email": "={{ $json.email }}"
+            },
+            {
+              "key": "Source|rich_text",
+              "textContent": "={{ $json.source }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "New"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "965661ea-3c15-42e8-88fd-a0d2d2ff6ad8",
+      "name": "Log Lead to Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "you@yourbusiness.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "Here's your free guide!",
+        "emailFormat": "html",
+        "html": "=<p>Hi {{ $json.name }},</p><p>Thanks for signing up! Here's your free download:</p><p><a href=\"https://yourdomain.com/lead-magnet.pdf\">Download your guide</a></p><p>Talk soon,<br>Your team</p>",
+        "options": {}
+      },
+      "id": "c6517ca4-4e98-4871-b634-e430765bbb78",
+      "name": "Deliver Lead Magnet Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1020,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "channelMessage",
+        "operation": "create",
+        "teamId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "channelId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "message": "=New lead captured: {{ $json.name }} ({{ $json.email }}) \u2014 logged to Notion CRM and sent the lead magnet.",
+        "options": {}
+      },
+      "id": "8f2c30a1-42f3-4ade-8f51-c1d5c11b3e8e",
+      "name": "Notify Sales Team (Teams)",
+      "type": "n8n-nodes-base.microsoftTeams",
+      "typeVersion": 1.1,
+      "position": [
+        1280,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "days"
+      },
+      "id": "a4844287-da0b-4286-8dfc-6c18104321de",
+      "name": "Wait 2 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        300
+      ],
+      "webhookId": "5cb2d16d-cf18-49c6-8912-d177677c5cfe"
+    },
+    {
+      "parameters": {
+        "fromEmail": "you@yourbusiness.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "Did you get a chance to check this out?",
+        "emailFormat": "html",
+        "html": "=<p>Hi {{ $json.name }},</p><p>Just checking in \u2014 did you get a chance to read the guide we sent over?</p><p>Happy to answer any questions, or if you'd like, you can book a quick call here: <a href=\"https://yourdomain.com/book-a-call\">Book a call</a></p><p>Best,<br>Your team</p>",
+        "options": {}
+      },
+      "id": "4413d015-7d99-4083-8b91-ce0cbdb8607e",
+      "name": "Send Follow-up Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1800,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Lead Form Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Log Lead to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Lead to Notion": {
+      "main": [
+        [
+          {
+            "node": "Deliver Lead Magnet Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deliver Lead Magnet Email": {
+      "main": [
+        [
+          {
+            "node": "Notify Sales Team (Teams)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Sales Team (Teams)": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 Days": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "d9ce3e2d-c17b-4c9f-a2d0-22baae6e388c"
+  }
+}
