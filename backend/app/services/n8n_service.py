@@ -7,6 +7,7 @@ from ..config import (
     N8N_BASE_URL,
     N8N_PUBLIC_URL,
     N8N_HEALTH_URL,
+    N8N_WEBHOOK_PATH,
     N8N_WEBHOOK_PROD_URL,
     N8N_WEBHOOK_TEST_URL,
     NODE_JSON_PATH,

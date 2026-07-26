@@ -19,13 +19,16 @@ import {
   Download,
   Filter,
   Search,
-  Server
+  Server,
+  TrendingUp,
+  DollarSign
 } from 'lucide-react';
 
 const BACKEND_URL = 'http://localhost:8000';
+const NOTION_DB_ID = '3a875e373f5480918a8eec701d1fe5d4';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('form'); // 'form' | 'pipeline' | 'leads' | 'guide'
+  const [activeTab, setActiveTab] = useState('form'); // 'form' | 'pipeline' | 'campaigns' | 'guide'
 
   // Health state
   const [health, setHealth] = useState({
@@ -38,17 +41,19 @@ export default function App() {
 
   // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    source: 'Lead Magnet Funnel',
+    campaign_name: '',
+    channel: 'Paid Social',
+    status: 'Active',
+    monthly_budget: 4000,
+    start_date: '2026-01-07',
     is_test_mode: false
   });
   const [submitting, setSubmitting] = useState(false);
   const [lastResponse, setLastResponse] = useState(null);
 
-  // Leads DB state
-  const [leads, setLeads] = useState([]);
-  const [loadingLeads, setLoadingLeads] = useState(false);
+  // Campaigns DB state
+  const [campaigns, setCampaigns] = useState([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -59,7 +64,7 @@ export default function App() {
   useEffect(() => {
     checkHealth();
     fetchWorkflowInfo();
-    fetchLeads();
+    fetchCampaigns();
 
     const interval = setInterval(checkHealth, 10000);
     return () => clearInterval(interval);
@@ -103,24 +108,24 @@ export default function App() {
     }
   };
 
-  const fetchLeads = async () => {
-    setLoadingLeads(true);
+  const fetchCampaigns = async () => {
+    setLoadingCampaigns(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/leads`);
       if (res.ok) {
         const data = await res.json();
-        setLeads(data.leads || []);
+        setCampaigns(data.campaigns || data.leads || []);
       }
     } catch (err) {
-      console.error('Failed to fetch leads:', err);
+      console.error('Failed to fetch campaigns:', err);
     } finally {
-      setLoadingLeads(false);
+      setLoadingCampaigns(false);
     }
   };
 
-  const handleSubmitLead = async (e) => {
+  const handleSubmitCampaign = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email) return;
+    if (!formData.campaign_name) return;
 
     setSubmitting(true);
     setLastResponse(null);
@@ -134,7 +139,7 @@ export default function App() {
       const data = await res.json();
       setLastResponse(data);
       if (res.ok) {
-        fetchLeads(); // refresh database table
+        fetchCampaigns(); // refresh database table
       }
     } catch (err) {
       setLastResponse({
@@ -146,47 +151,60 @@ export default function App() {
     }
   };
 
-  const handleDeleteLead = async (id) => {
-    if (!confirm(`Are you sure you want to delete lead #${id}?`)) return;
+  const handleDeleteCampaign = async (id) => {
+    if (!confirm(`Are you sure you want to delete campaign #${id}?`)) return;
     try {
       const res = await fetch(`${BACKEND_URL}/api/leads/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        fetchLeads();
+        fetchCampaigns();
       }
     } catch (err) {
       alert(`Delete failed: ${err.message}`);
     }
   };
 
-  const fillSampleLead = () => {
-    const randomId = Math.floor(Math.random() * 899 + 100);
+  const fillSampleCampaign = () => {
+    const samples = [
+      { name: 'Summer Awareness Push', channel: 'Paid Social', status: 'Active', budget: 4000, start: '2026-01-07' },
+      { name: 'SEO Content Refresh', channel: 'Content/SEO', status: 'Active', budget: 2500, start: '2026-01-07' },
+      { name: 'Fall Conference', channel: 'Email Marketing', status: 'Active', budget: 800, start: '2026-06-15' },
+      { name: 'Welcome Email Series', channel: 'Events', status: 'Planned', budget: 3000, start: '2026-10-09' }
+    ];
+    const picked = samples[Math.floor(Math.random() * samples.length)];
+    const randomSuffix = Math.floor(Math.random() * 90 + 10);
     setFormData({
-      name: `Alex Morgan ${randomId}`,
-      email: `alex.morgan${randomId}@example.com`,
-      source: 'Lead Magnet Funnel',
+      campaign_name: `${picked.name} v${randomSuffix}`,
+      channel: picked.channel,
+      status: picked.status,
+      monthly_budget: picked.budget,
+      start_date: picked.start,
       is_test_mode: false
     });
   };
 
-  const exportLeadsJSON = () => {
-    const jsonStr = JSON.stringify(leads, null, 2);
+  const exportCampaignsJSON = () => {
+    const jsonStr = JSON.stringify(campaigns, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `leads-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `campaigns-export-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   };
 
-  const filteredLeads = leads.filter(l => {
+  const filteredCampaigns = campaigns.filter(c => {
+    const name = c.campaign_name || c.name || '';
+    const channel = c.channel || c.email || '';
     const matchesSearch =
-      l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.email.toLowerCase().includes(searchQuery.toLowerCase());
+      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      channel.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
       statusFilter === 'ALL' ||
-      (statusFilter === 'SENT' && l.n8n_status === 'sent') ||
-      (statusFilter === 'FAILED' && l.n8n_status === 'failed') ||
-      (statusFilter === 'TEST' && l.is_test_mode);
+      (statusFilter === 'Active' && c.status === 'Active') ||
+      (statusFilter === 'Planned' && c.status === 'Planned') ||
+      (statusFilter === 'SENT' && c.n8n_status === 'sent') ||
+      (statusFilter === 'FAILED' && c.n8n_status === 'failed') ||
+      (statusFilter === 'TEST' && c.is_test_mode);
     return matchesSearch && matchesStatus;
   });
 
@@ -222,21 +240,21 @@ export default function App() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '12px',
-                background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                background: 'linear-gradient(135deg, #10B981, #3B82F6)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)'
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
               }}
             >
-              <Zap size={24} color="#FFF" />
+              <TrendingUp size={24} color="#FFF" />
             </div>
             <div>
               <h1 style={{ fontSize: '1.35rem', lineHeight: '1.2' }}>
-                n8n Lead Magnet Funnel Portal
+                Marketing Campaigns &amp; Notion Portal
               </h1>
               <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                FastAPI Backend (8000) &bull; Frontend (3000) &bull; n8n (5678)
+                Notion DB: <code>Marketing_Campaigns_Database</code> ({NOTION_DB_ID}) &bull; n8n (5678)
               </p>
             </div>
           </div>
@@ -299,17 +317,17 @@ export default function App() {
               className="btn btn-secondary"
               style={{ padding: '8px 16px', fontSize: '0.825rem', borderRadius: '9999px' }}
             >
-              Open n8n UI <ExternalLink size={14} />
+              <ExternalLink size={14} /> Open n8n UI
             </a>
           </div>
         </div>
       </header>
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs Bar */}
       <div
         style={{
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          background: 'rgba(10, 15, 26, 0.6)',
+          background: 'rgba(15, 23, 42, 0.4)',
           padding: '0 32px'
         }}
       >
@@ -318,165 +336,141 @@ export default function App() {
             maxWidth: '1400px',
             margin: '0 auto',
             display: 'flex',
-            gap: '8px',
-            overflowX: 'auto'
+            gap: '8px'
           }}
         >
           <button
             onClick={() => setActiveTab('form')}
-            style={{
-              padding: '14px 20px',
-              border: 'none',
-              background: 'none',
-              color: activeTab === 'form' ? '#FFF' : 'var(--text-muted)',
-              fontWeight: 600,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'form' ? '2px solid #8B5CF6' : '2px solid transparent',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s'
-            }}
+            className={`tab-btn ${activeTab === 'form' ? 'active' : ''}`}
           >
-            <Send size={16} /> Webhook Lead Tester
+            <Send size={16} /> Campaign Creator Form
           </button>
-
           <button
             onClick={() => setActiveTab('pipeline')}
-            style={{
-              padding: '14px 20px',
-              border: 'none',
-              background: 'none',
-              color: activeTab === 'pipeline' ? '#FFF' : 'var(--text-muted)',
-              fontWeight: 600,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'pipeline' ? '2px solid #8B5CF6' : '2px solid transparent',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s'
-            }}
+            className={`tab-btn ${activeTab === 'pipeline' ? 'active' : ''}`}
           >
             <Layers size={16} /> Workflow Pipeline Visualizer
           </button>
-
           <button
-            onClick={() => setActiveTab('leads')}
-            style={{
-              padding: '14px 20px',
-              border: 'none',
-              background: 'none',
-              color: activeTab === 'leads' ? '#FFF' : 'var(--text-muted)',
-              fontWeight: 600,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'leads' ? '2px solid #8B5CF6' : '2px solid transparent',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s'
-            }}
+            onClick={() => setActiveTab('campaigns')}
+            className={`tab-btn ${activeTab === 'campaigns' ? 'active' : ''}`}
           >
-            <Database size={16} /> Submissions Log ({leads.length})
+            <Database size={16} /> Campaigns Database Log ({campaigns.length})
           </button>
-
           <button
             onClick={() => setActiveTab('guide')}
-            style={{
-              padding: '14px 20px',
-              border: 'none',
-              background: 'none',
-              color: activeTab === 'guide' ? '#FFF' : 'var(--text-muted)',
-              fontWeight: 600,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'guide' ? '2px solid #8B5CF6' : '2px solid transparent',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s'
-            }}
+            className={`tab-btn ${activeTab === 'guide' ? 'active' : ''}`}
           >
-            <FileText size={16} /> Setup & Credentials Guide
+            <FileText size={16} /> Notion DB Setup &amp; Guide
           </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <main style={{ flex: 1, padding: '32px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
-        {/* TAB 1: Lead Webhook Form & Response */}
+      {/* Main Content Body */}
+      <main style={{ flex: 1, maxWidth: '1400px', width: '100%', margin: '0 auto', padding: '32px' }}>
+        {/* TAB 1: Campaign Creator Form & Live Response */}
         {activeTab === 'form' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '32px' }}>
-            {/* Form Box */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '32px' }}>
+            {/* Left Card: Form */}
             <div className="glass-panel" style={{ padding: '32px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', marginBottom: '4px' }}>Submit Lead Data</h2>
+                  <h2 style={{ fontSize: '1.25rem', marginBottom: '4px' }}>
+                    Create Marketing Campaign
+                  </h2>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Fires POST request to n8n webhook endpoint at <code>/webhook/lead-magnet-signup</code>
+                    Fires POST request to n8n webhook and creates page in Notion <code>Marketing_Campaigns_Database</code>
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={fillSampleLead}
+                  onClick={fillSampleCampaign}
                   className="btn btn-secondary"
                   style={{ fontSize: '0.75rem', padding: '6px 12px' }}
                 >
-                  Auto Fill Demo Lead
+                  Auto Fill Demo Campaign
                 </button>
               </div>
 
-              <form onSubmit={handleSubmitLead}>
-                <div className="form-group">
-                  <label className="form-label">Full Name *</label>
+              <form onSubmit={handleSubmitCampaign} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <label className="form-label">Campaign Name *</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="e.g. John Doe"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Summer Awareness Push"
+                    value={formData.campaign_name}
+                    onChange={(e) => setFormData({ ...formData, campaign_name: e.target.value })}
                     required
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Email Address *</label>
-                  <input
-                    type="email"
-                    className="form-input"
-                    placeholder="e.g. john@company.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label className="form-label">Channel</label>
+                    <select
+                      className="form-select"
+                      value={formData.channel}
+                      onChange={(e) => setFormData({ ...formData, channel: e.target.value })}
+                    >
+                      <option value="Paid Social">Paid Social</option>
+                      <option value="Content/SEO">Content/SEO</option>
+                      <option value="Email Marketing">Email Marketing</option>
+                      <option value="Events">Events</option>
+                      <option value="Influencer/PR">Influencer/PR</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="form-label">Status</label>
+                    <select
+                      className="form-select"
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Planned">Planned</option>
+                      <option value="Paused">Paused</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Lead Source</label>
-                  <select
-                    className="form-select"
-                    value={formData.source}
-                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                  >
-                    <option value="Lead Magnet Funnel">Lead Magnet Funnel</option>
-                    <option value="Website Form">Website Form</option>
-                    <option value="Social Campaign">Social Campaign</option>
-                    <option value="Direct API">Direct API</option>
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label className="form-label">Monthly Budget ($)</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      placeholder="4000"
+                      value={formData.monthly_budget}
+                      onChange={(e) => setFormData({ ...formData, monthly_budget: parseFloat(e.target.value) || 0 })}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="form-label">Start Date</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={formData.start_date}
+                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
                   <input
                     type="checkbox"
                     id="test_mode"
                     checked={formData.is_test_mode}
                     onChange={(e) => setFormData({ ...formData, is_test_mode: e.target.checked })}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--accent-purple)' }}
                   />
-                  <label htmlFor="test_mode" className="form-label" style={{ margin: 0, cursor: 'pointer' }}>
-                    Use Test Webhook (<code>/webhook-test/lead-magnet-signup</code>)
+                  <label htmlFor="test_mode" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                    Use Test Webhook ( <code>/webhook-test/lead-magnet-signup</code> )
                   </label>
                 </div>
 
@@ -484,25 +478,24 @@ export default function App() {
                   type="submit"
                   disabled={submitting}
                   className="btn btn-primary"
-                  style={{ width: '100%', marginTop: '20px', padding: '14px' }}
+                  style={{ width: '100%', marginTop: '8px', padding: '14px' }}
                 >
                   {submitting ? (
                     <>
-                      <RefreshCw size={18} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
-                      Triggering n8n Webhook...
+                      <RefreshCw size={18} className="spin" /> Triggering n8n Webhook...
                     </>
                   ) : (
                     <>
-                      <Send size={18} /> Trigger Lead Magnet Webhook
+                      <Send size={18} /> Submit Campaign to Notion
                     </>
                   )}
                 </button>
               </form>
             </div>
 
-            {/* Response Card */}
+            {/* Right Card: Live Response Log */}
             <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column' }}>
-              <h2 style={{ fontSize: '1.25rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '1.25rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Activity size={20} color="var(--accent-purple)" /> Real-Time Response Log
               </h2>
 
@@ -514,85 +507,79 @@ export default function App() {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: '2px dashed rgba(255, 255, 255, 0.08)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '40px',
+                    color: 'var(--text-dim)',
                     textAlign: 'center',
-                    color: 'var(--text-dim)'
+                    padding: '40px 20px',
+                    border: '2px dashed rgba(255, 255, 255, 0.08)',
+                    borderRadius: 'var(--radius-md)'
                   }}
                 >
-                  <Send size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                  <p>No webhook triggered yet.</p>
-                  <p style={{ fontSize: '0.8rem' }}>Fill in lead details and click "Trigger Lead Magnet Webhook".</p>
+                  <Zap size={36} style={{ marginBottom: '12px', opacity: 0.4 }} />
+                  <p>No campaign submitted yet in this session.</p>
+                  <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>Fill out the form and submit to see live execution trace.</p>
                 </div>
               ) : (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* Status Banner */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Status Box */}
                   <div
                     style={{
-                      padding: '16px',
+                      padding: '20px',
                       borderRadius: 'var(--radius-md)',
-                      background: lastResponse.status === 'sent'
-                        ? 'rgba(16, 185, 129, 0.12)'
-                        : 'rgba(244, 63, 94, 0.12)',
-                      border: lastResponse.status === 'sent'
-                        ? '1px solid rgba(16, 185, 129, 0.3)'
-                        : '1px solid rgba(244, 63, 94, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px'
+                      background: lastResponse.status === 'sent' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
+                      border: `1px solid ${lastResponse.status === 'sent' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'}`
                     }}
                   >
-                    {lastResponse.status === 'sent' ? (
-                      <CheckCircle2 size={24} color="var(--accent-emerald)" />
-                    ) : (
-                      <AlertCircle size={24} color="var(--accent-rose)" />
-                    )}
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                        {lastResponse.status === 'sent'
-                          ? 'Webhook Accepted by n8n!'
-                          : 'Webhook Execution Failed'}
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Lead ID: #{lastResponse.lead_id} &bull; Target:{' '}
-                        <code>{lastResponse.n8n_result?.target_url || 'Unknown'}</code>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Metadata Cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>HTTP Status Code</div>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: lastResponse.n8n_result?.success ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
-                        {lastResponse.n8n_result?.status_code || 'Err'}
-                      </div>
-                    </div>
-
-                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Latency</div>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-blue)' }}>
-                        {lastResponse.n8n_result?.latency_ms ? `${lastResponse.n8n_result.latency_ms} ms` : 'N/A'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      {lastResponse.status === 'sent' ? (
+                        <CheckCircle2 size={24} color="var(--accent-emerald)" />
+                      ) : (
+                        <AlertCircle size={24} color="var(--accent-rose)" />
+                      )}
+                      <div>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>
+                          {lastResponse.status === 'sent' ? 'Webhook Executed Successfully' : 'Webhook Execution Failed'}
+                        </h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          Campaign ID: #{lastResponse.campaign_id || lastResponse.lead_id} &bull; Target: {lastResponse.n8n_result?.target_url}
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Response Payload */}
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                      Response Body Output:
+                  {/* Metrics */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>HTTP Status Code</span>
+                      <p style={{ fontSize: '1.5rem', fontWeight: 700, color: lastResponse.n8n_result?.status_code === 200 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                        {lastResponse.n8n_result?.status_code || 500}
+                      </p>
                     </div>
-                    <pre className="code-block" style={{ flex: 1, maxHeight: '220px' }}>
+
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Latency</span>
+                      <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-blue)' }}>
+                        {lastResponse.n8n_result?.latency_ms || 0} ms
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Raw Output */}
+                  <div>
+                    <label className="form-label">Response Body Output:</label>
+                    <pre
+                      style={{
+                        background: 'rgba(10, 15, 26, 0.9)',
+                        padding: '16px',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.8rem',
+                        color: 'var(--accent-cyan)',
+                        overflowX: 'auto',
+                        border: '1px solid rgba(255, 255, 255, 0.05)'
+                      }}
+                    >
                       {JSON.stringify(lastResponse.n8n_result?.response || lastResponse, null, 2)}
                     </pre>
                   </div>
-
-                  {lastResponse.n8n_result?.error && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', background: 'rgba(244,63,94,0.1)', padding: '10px', borderRadius: '8px' }}>
-                      <strong>Error details:</strong> {lastResponse.n8n_result.error}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -607,7 +594,7 @@ export default function App() {
                 n8n Workflow Execution Diagram
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Visual map of nodes parsed directly from <code>data/node.json</code> ("Lead Magnet Funnel - Notion + Teams")
+                Visual map of nodes parsed directly from <code>data/node.json</code> ("Marketing Campaigns Funnel - Notion Integration")
               </p>
             </div>
 
@@ -626,7 +613,7 @@ export default function App() {
                   POST Endpoint: <code>/webhook/lead-magnet-signup</code>
                 </p>
                 <div style={{ fontSize: '0.75rem', background: 'rgba(15,23,42,0.6)', padding: '8px', borderRadius: '6px' }}>
-                  Input: <code>{`{ name, email }`}</code>
+                  Input: <code>{`{ campaign_name, channel, monthly_budget, start_date }`}</code>
                 </div>
               </div>
 
@@ -637,106 +624,89 @@ export default function App() {
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>#2</span>
                 </div>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Settings size={18} color="var(--accent-blue)" /> Normalize Lead Data
+                  <Settings size={18} color="var(--accent-blue)" /> Normalize Campaign Data
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
                   Standardizes variables &amp; adds timestamp <code>submittedAt</code>.
                 </p>
                 <div style={{ fontSize: '0.75rem', background: 'rgba(15,23,42,0.6)', padding: '8px', borderRadius: '6px' }}>
-                  Fields: name, email, source, submittedAt
+                  Fields: campaign_name, channel, status, monthly_budget, start_date
                 </div>
               </div>
 
               {/* Step 3: Notion */}
               <div className="glass-panel glass-panel-interactive" style={{ padding: '20px', borderTop: '4px solid var(--accent-emerald)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <span className="badge badge-success">Notion CRM</span>
+                  <span className="badge badge-success">Notion DB</span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>#3</span>
                 </div>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Database size={18} color="var(--accent-emerald)" /> Log Lead to Notion
+                  <Database size={18} color="var(--accent-emerald)" /> Log Campaign to Notion
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  Creates page in Notion DB with Status: "New".
+                  Creates page in <code>Marketing_Campaigns_Database</code>.
                 </p>
                 <div style={{ fontSize: '0.75rem', background: 'rgba(15,23,42,0.6)', padding: '8px', borderRadius: '6px' }}>
-                  Database ID: <code>YOUR_NOTION_DATABASE_ID</code>
+                  Database ID: <code>{NOTION_DB_ID}</code>
                 </div>
               </div>
 
               {/* Step 4: Email Send */}
               <div className="glass-panel glass-panel-interactive" style={{ padding: '20px', borderTop: '4px solid var(--accent-amber)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <span className="badge badge-warning">Email SMTP</span>
+                  <span className="badge badge-warning">Email Alert</span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>#4</span>
                 </div>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Mail size={18} color="var(--accent-amber)" /> Deliver Lead Magnet Email
+                  <Mail size={18} color="var(--accent-amber)" /> Deliver Confirmation Email
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  Sends HTML email with guide download link.
+                  Sends HTML email summary of campaign parameters.
                 </p>
                 <div style={{ fontSize: '0.75rem', background: 'rgba(15,23,42,0.6)', padding: '8px', borderRadius: '6px' }}>
-                  Subject: "Here's your free guide!"
+                  Subject: "🚀 New Campaign Created"
                 </div>
               </div>
 
-              {/* Step 5: MS Teams */}
+              {/* Step 5: Email Notification */}
               <div className="glass-panel glass-panel-interactive" style={{ padding: '20px', borderTop: '4px solid #3B82F6' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <span className="badge badge-purple">Teams Bot</span>
+                  <span className="badge badge-purple">Team Notification</span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>#5</span>
                 </div>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={18} color="#3B82F6" /> Notify Sales Team (Teams)
+                  <Mail size={18} color="#3B82F6" /> Notify Sales &amp; Marketing Team
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  Posts notification to Teams sales channel.
+                  Sends internal email alert to team on new campaign.
                 </p>
                 <div style={{ fontSize: '0.75rem', background: 'rgba(15,23,42,0.6)', padding: '8px', borderRadius: '6px' }}>
-                  Channel: Sales Alerts
+                  To: sales@mydomain.com
                 </div>
               </div>
 
-              {/* Step 6: Wait Node */}
-              <div className="glass-panel glass-panel-interactive" style={{ padding: '20px', borderTop: '4px solid var(--text-muted)' }}>
+              {/* Step 6: Follow up (Immediate) */}
+              <div className="glass-panel glass-panel-interactive" style={{ padding: '20px', borderTop: '4px solid var(--accent-pink)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Delay</span>
+                  <span className="badge badge-danger">Checklist</span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>#6</span>
                 </div>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Clock size={18} color="var(--text-muted)" /> Wait 2 Days
+                  <Mail size={18} color="var(--accent-pink)" /> Send Campaign Follow-up
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  Pauses workflow execution for 2 days.
+                  Sends campaign activation checklist immediately.
                 </p>
                 <div style={{ fontSize: '0.75rem', background: 'rgba(15,23,42,0.6)', padding: '8px', borderRadius: '6px' }}>
-                  Duration: 2 Days
-                </div>
-              </div>
-
-              {/* Step 7: Follow up */}
-              <div className="glass-panel glass-panel-interactive" style={{ padding: '20px', borderTop: '4px solid var(--accent-pink)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <span className="badge badge-danger">Follow Up</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>#7</span>
-                </div>
-                <h3 style={{ fontSize: '1rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Mail size={18} color="var(--accent-pink)" /> Send Follow-up Email
-                </h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  Sends call booking link follow-up.
-                </p>
-                <div style={{ fontSize: '0.75rem', background: 'rgba(15,23,42,0.6)', padding: '8px', borderRadius: '6px' }}>
-                  Link: "Book a call"
+                  Subject: "Campaign Activation Checklist"
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 3: Submissions Database Log */}
-        {activeTab === 'leads' && (
+        {/* TAB 3: Campaigns Database Log */}
+        {activeTab === 'campaigns' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Top Toolbar */}
             <div
@@ -760,7 +730,7 @@ export default function App() {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Search leads by name or email..."
+                    placeholder="Search campaigns by name or channel..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     style={{ paddingLeft: '38px', width: '100%' }}
@@ -774,6 +744,8 @@ export default function App() {
                   style={{ width: '160px' }}
                 >
                   <option value="ALL">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Planned">Planned</option>
                   <option value="SENT">Sent to n8n</option>
                   <option value="FAILED">Failed</option>
                   <option value="TEST">Test Mode</option>
@@ -781,16 +753,16 @@ export default function App() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <button onClick={fetchLeads} className="btn btn-secondary">
-                  <RefreshCw size={16} className={loadingLeads ? 'spin' : ''} /> Refresh
+                <button onClick={fetchCampaigns} className="btn btn-secondary">
+                  <RefreshCw size={16} className={loadingCampaigns ? 'spin' : ''} /> Refresh
                 </button>
-                <button onClick={exportLeadsJSON} className="btn btn-secondary">
+                <button onClick={exportCampaignsJSON} className="btn btn-secondary">
                   <Download size={16} /> Export JSON
                 </button>
               </div>
             </div>
 
-            {/* Leads Table */}
+            {/* Campaigns Table */}
             <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
@@ -806,56 +778,72 @@ export default function App() {
                       }}
                     >
                       <th style={{ padding: '16px 24px' }}>ID</th>
-                      <th style={{ padding: '16px 24px' }}>Name</th>
-                      <th style={{ padding: '16px 24px' }}>Email</th>
-                      <th style={{ padding: '16px 24px' }}>Source</th>
-                      <th style={{ padding: '16px 24px' }}>Submitted At</th>
-                      <th style={{ padding: '16px 24px' }}>n8n Webhook Status</th>
+                      <th style={{ padding: '16px 24px' }}>Campaign Name</th>
+                      <th style={{ padding: '16px 24px' }}>Channel</th>
+                      <th style={{ padding: '16px 24px' }}>Status</th>
+                      <th style={{ padding: '16px 24px' }}>Monthly Budget</th>
+                      <th style={{ padding: '16px 24px' }}>Start Date</th>
+                      <th style={{ padding: '16px 24px' }}>n8n Status</th>
                       <th style={{ padding: '16px 24px', textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredLeads.length === 0 ? (
+                    {filteredCampaigns.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
-                          No leads found in SQLite database.
+                        <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                          No campaigns found in SQLite database.
                         </td>
                       </tr>
                     ) : (
-                      filteredLeads.map((lead) => (
+                      filteredCampaigns.map((c) => (
                         <tr
-                          key={lead.id}
+                          key={c.id}
                           style={{
                             borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
                             transition: 'background 0.2s'
                           }}
                         >
                           <td style={{ padding: '16px 24px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                            #{lead.id}
+                            #{c.id}
                           </td>
-                          <td style={{ padding: '16px 24px', fontWeight: 600 }}>{lead.name}</td>
-                          <td style={{ padding: '16px 24px', color: 'var(--accent-blue)' }}>{lead.email}</td>
-                          <td style={{ padding: '16px 24px', color: 'var(--text-muted)' }}>{lead.source}</td>
-                          <td style={{ padding: '16px 24px', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                            {new Date(lead.submitted_at).toLocaleString()}
+                          <td style={{ padding: '16px 24px', fontWeight: 600, color: '#FFF' }}>
+                            {c.campaign_name || c.name}
+                          </td>
+                          <td style={{ padding: '16px 24px', color: 'var(--accent-blue)' }}>
+                            {c.channel || c.email}
                           </td>
                           <td style={{ padding: '16px 24px' }}>
                             <span
                               className={`badge ${
-                                lead.n8n_status === 'sent'
+                                c.status === 'Active' ? 'badge-success' : 'badge-warning'
+                              }`}
+                            >
+                              {c.status || 'Active'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '16px 24px', fontWeight: 600, color: 'var(--accent-emerald)' }}>
+                            ${(c.monthly_budget || 4000).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '16px 24px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            {c.start_date || '2026-01-07'}
+                          </td>
+                          <td style={{ padding: '16px 24px' }}>
+                            <span
+                              className={`badge ${
+                                c.n8n_status === 'sent'
                                   ? 'badge-success'
-                                  : lead.n8n_status === 'failed'
+                                  : c.n8n_status === 'failed'
                                   ? 'badge-danger'
                                   : 'badge-warning'
                               }`}
                             >
-                              {lead.n8n_status}
-                              {lead.is_test_mode ? ' (Test)' : ''}
+                              {c.n8n_status || 'pending'}
+                              {c.is_test_mode ? ' (Test)' : ''}
                             </span>
                           </td>
                           <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                             <button
-                              onClick={() => handleDeleteLead(lead.id)}
+                              onClick={() => handleDeleteCampaign(c.id)}
                               className="btn btn-danger"
                               style={{ padding: '6px 10px', fontSize: '0.75rem' }}
                             >
@@ -876,7 +864,7 @@ export default function App() {
         {activeTab === 'guide' && (
           <div className="glass-panel" style={{ padding: '32px' }}>
             <h2 style={{ fontSize: '1.35rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <CheckCircle2 size={24} color="var(--accent-emerald)" /> n8n Workflow Setup Checklist
+              <CheckCircle2 size={24} color="var(--accent-emerald)" /> Notion Marketing_Campaigns_Database Integration Guide
             </h2>
             <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
               Extracted directly from n8n sticky note node in <code>data/node.json</code>:
@@ -888,35 +876,37 @@ export default function App() {
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
                   Production URL: <code>http://localhost:5678/webhook/lead-magnet-signup</code>
                   <br />
-                  Paste this into your form tool (Tally, Typeform, Webflow) or use our FastAPI backend submit button.
+                  Fires POST requests containing campaign parameters (name, channel, status, monthly_budget, start_date).
                 </p>
               </div>
 
               <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '20px', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--accent-emerald)' }}>
-                <h4 style={{ fontSize: '1rem', marginBottom: '6px' }}>2. Notion Database Integration</h4>
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                  Add Notion API credentials in n8n, then replace <code>YOUR_NOTION_DATABASE_ID</code> and match property names (Name, Email, Source, Status="New").
+                <h4 style={{ fontSize: '1rem', marginBottom: '6px' }}>2. Notion Database Property Mapping</h4>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                  Target Notion Database: <code>Marketing_Campaigns_Database</code> (ID: <code>{NOTION_DB_ID}</code>)
                 </p>
+                <div style={{ fontSize: '0.8rem', background: 'rgba(10,15,26,0.8)', padding: '12px', borderRadius: '6px' }}>
+                  <ul>
+                    <li><code>Campaign name</code> (Title) &bull; e.g. "Summer Awareness Push"</li>
+                    <li><code>Channel</code> (Select) &bull; "Paid Social", "Content/SEO", "Email Marketing", "Events"</li>
+                    <li><code>Status</code> (Select) &bull; "Active", "Planned", "Paused"</li>
+                    <li><code>Monthly Budget</code> (Number) &bull; e.g. 4000</li>
+                    <li><code>Start Date</code> (Date) &bull; e.g. 2026-01-07</li>
+                  </ul>
+                </div>
               </div>
 
               <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '20px', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--accent-amber)' }}>
-                <h4 style={{ fontSize: '1rem', marginBottom: '6px' }}>3. Email Delivery (x2 Nodes)</h4>
+                <h4 style={{ fontSize: '1rem', marginBottom: '6px' }}>3. Email Delivery &amp; Notifications</h4>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                  Add SMTP or Gmail credentials in n8n, set the From address, and customize the lead-magnet download &amp; follow-up call links.
-                </p>
-              </div>
-
-              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '20px', borderRadius: 'var(--radius-md)', borderLeft: '4px solid #3B82F6' }}>
-                <h4 style={{ fontSize: '1rem', marginBottom: '6px' }}>4. Microsoft Teams Channel Alerts</h4>
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                  Add Microsoft Teams OAuth2 credentials in n8n, then pick your Team and Channel for lead alert notifications.
+                  Sends launch summaries and team alerts whenever a new marketing campaign is added.
                 </p>
               </div>
 
               <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '20px', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--accent-pink)' }}>
-                <h4 style={{ fontSize: '1rem', marginBottom: '6px' }}>5. Activate Workflow</h4>
+                <h4 style={{ fontSize: '1rem', marginBottom: '6px' }}>4. Activate Workflow</h4>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                  Open n8n at <code>http://localhost:5678</code> and toggle the workflow to <strong>Active</strong>.
+                  Open n8n at <code>http://localhost:5678/workflow/h1AhBG0r8zPvXkrb</code> and toggle the workflow to <strong>Active</strong>.
                 </p>
               </div>
             </div>

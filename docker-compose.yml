@@ -5,6 +5,9 @@ services:
     restart: always
     ports:
       - "5678:5678"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       - N8N_HOST=0.0.0.0
       - N8N_PORT=5678
